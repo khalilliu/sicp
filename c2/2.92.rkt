@@ -1,7 +1,7 @@
 #lang sicp
 
 
-;; Ex 2.91
+;; Ex 2.92
 ;;
 
 ;; ======================================================================
@@ -377,22 +377,36 @@
     (and (variable? v1) (variable? v2) (eq? v1 v2)))
   (define variable? symbol?)
 
+  ;; use alphabetic order of the variable to decide which representation to use
+  (define (var-order>? v1 v2)
+    (string>? (symbol->string v1) (symbol->string v2)))
+
+  (define (coerce-poly psrc ptarget)
+    (let ((coerce-var (variable ptarget))
+          (poly-constructor (if (eq? (type-tag (contents psrc)) 'dense)
+                                make-dense-polynomial
+                                make-sparse-polynomial))
+          (zeroth-term (make-term 0 (tag psrc))))
+        (contents (poly-constructor coerce-var (list zeroth-term )))))
   
   (define (add-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
+    (cond ((same-variable? (variable p1) (variable p2))
         (make-poly (variable p1)
                    (add (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- ADD-POLY"
-               (list p1 p2))))
+                        (term-list p2))))
+        ;; not same variable
+        ((var-order>? (variable p1) (variable p2))
+          (add-poly p1 (coerce-poly p2 p1)))
+        (else (add-poly p2 (coerce-poly p1 p2)))))
 
   (define (mul-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
+    (cond ((same-variable? (variable p1) (variable p2))
         (make-poly (variable p1)
                    (mul (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- MUL-POLY"
-               (list p1 p2))))
+                        (term-list p2))))
+        ((var-order>? (variable p1) (variable p2))
+          (mul-poly p1 (coerce-poly p2 p1)))
+        (else (mul-poly p2 (coerce-poly p1 p2)))))
 
   (define (poly-zero? p)
     (=zero? (term-list p)))
@@ -402,20 +416,7 @@
                (negate (term-list p))))
 
   (define (sub-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-        (make-poly (variable p1)
-                   (sub (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- SUB-POLY"
-               (list p1 p2))))
-
-  (define (add-integer-poly i p)
-    (make-poly (variable p)
-               (add i (term-list p))))
-
-  (define (mul-integer-poly i p)
-    (make-poly (variable p)
-               (mul i (term-list p))))
+    (add-poly p1 (negate-poly p2)))
 
   (define (sub-integer-poly i p)
     (make-poly (variable p)
@@ -425,9 +426,17 @@
     (make-poly (variable p)
                (sub (term-list p) i)))
 
+  (define (add-integer-poly i p)
+    (make-poly (variable p)
+               (add i (term-list p))))
+
+  (define (mul-integer-poly i p)
+    (make-poly (variable p)
+               (mul i (term-list p))))
+
   (define (div-result var terms)
     (list (tag (make-poly var (car terms)))
-          (tag (make-poly var (cdr terms)))))
+          (tag (make-poly var (cadr terms)))))
 
   (define (div-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
@@ -460,6 +469,7 @@
   (put 'div    '(integer polynomial)    (lambda (i p)         (div-integer-poly i p)))
   (put 'div    '(polynomial integer)    (lambda (p i)         (div-poly-integer p i)))
   (put 'negate '(polynomial)            (lambda (p)           (tag (negate-poly p))))
+
 
   'done)
 
@@ -865,27 +875,15 @@
 ;; Test case
 ;;
 ;; ======================================================================
-
+(define (show x) (newline) (display x))
 
 ; 2 versions of the example division given in the book i.e. (x^5 -1) / (x^2 - 1)
-(define divisor-s  (make-sparse-polynomial 'x '((5 1) (0 -1))))
-(define dividend-s (make-sparse-polynomial 'x '((2 1) (0 -1))))
-(define divisor-d  (make-dense-polynomial 'x '(1 0 0 0 0 -1)))
-(define dividend-d (make-dense-polynomial 'x '(1 0 -1)))
+(define p1 (make-sparse-polynomial 'x '((2 1) (0 1))))
+(define p2 (make-sparse-polynomial 'y '((3 1) (0 1))))
 
-(display (div divisor-s dividend-s)) (newline)
-; ((polynomial x sparse (3 1) (1 1)) (polynomial x sparse (1 1) (0 -1)))
-(display (div divisor-d dividend-d)) (newline)
-; ((polynomial x dense 1 0 1 0) (polynomial x dense 1 -1))
-(display (div divisor-d divisor-d)) (newline)
-; ((polynomial x dense 1) (polynomial x dense))
-(display (div divisor-s divisor-s)) (newline)
-; ((polynomial x sparse (0 1)) (polynomial x sparse))
-(display (div divisor-d divisor-s)) (newline)
-; ((polynomial x dense 1) (polynomial x dense))
-(display (div divisor-s divisor-d)) (newline)
-; ((polynomial x sparse (0 1)) (polynomial x sparse))
-(display (div divisor-d dividend-s)) (newline)
-; ((polynomial x dense 1 0 1 0) (polynomial x dense 1 -1))
-(display (div divisor-s dividend-d)) (newline)
-; ((polynomial x sparse (3 1) (1 1)) (polynomial x sparse (1 1) (0 -1)))
+(show (add p1 p2))
+;; (polynomial y sparse (3 1) (0 (polynomial x sparse (2 1) (0 2))))
+(show (sub p1 p2))
+;; (polynomial y sparse (3 -1) (0 (polynomial x sparse (2 1))))
+(show (mul p1 p2))
+;; (polynomial y sparse (3 (polynomial x sparse (2 1) (0 1))) (0 (polynomial x sparse (2 1) (0 1))))

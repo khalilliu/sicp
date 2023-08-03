@@ -1,7 +1,7 @@
 #lang sicp
 
 
-;; Ex 2.91
+;; Ex 2.93
 ;;
 
 ;; ======================================================================
@@ -377,22 +377,36 @@
     (and (variable? v1) (variable? v2) (eq? v1 v2)))
   (define variable? symbol?)
 
+  ;; use alphabetic order of the variable to decide which representation to use
+  (define (var-order>? v1 v2)
+    (string>? (symbol->string v1) (symbol->string v2)))
+
+  (define (coerce-poly psrc ptarget)
+    (let ((coerce-var (variable ptarget))
+          (poly-constructor (if (eq? (type-tag (contents psrc)) 'dense)
+                                make-dense-polynomial
+                                make-sparse-polynomial))
+          (zeroth-term (make-term 0 (tag psrc))))
+        (contents (poly-constructor coerce-var (list zeroth-term )))))
   
   (define (add-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
+    (cond ((same-variable? (variable p1) (variable p2))
         (make-poly (variable p1)
                    (add (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- ADD-POLY"
-               (list p1 p2))))
+                        (term-list p2))))
+        ;; not same variable
+        ((var-order>? (variable p1) (variable p2))
+          (add-poly p1 (coerce-poly p2 p1)))
+        (else (add-poly p2 (coerce-poly p1 p2)))))
 
   (define (mul-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
+    (cond ((same-variable? (variable p1) (variable p2))
         (make-poly (variable p1)
                    (mul (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- MUL-POLY"
-               (list p1 p2))))
+                        (term-list p2))))
+        ((var-order>? (variable p1) (variable p2))
+          (mul-poly p1 (coerce-poly p2 p1)))
+        (else (mul-poly p2 (coerce-poly p1 p2)))))
 
   (define (poly-zero? p)
     (=zero? (term-list p)))
@@ -402,20 +416,7 @@
                (negate (term-list p))))
 
   (define (sub-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-        (make-poly (variable p1)
-                   (sub (term-list p1)
-                        (term-list p2)))
-        (error "Polys not in same var -- SUB-POLY"
-               (list p1 p2))))
-
-  (define (add-integer-poly i p)
-    (make-poly (variable p)
-               (add i (term-list p))))
-
-  (define (mul-integer-poly i p)
-    (make-poly (variable p)
-               (mul i (term-list p))))
+    (add-poly p1 (negate-poly p2)))
 
   (define (sub-integer-poly i p)
     (make-poly (variable p)
@@ -425,9 +426,17 @@
     (make-poly (variable p)
                (sub (term-list p) i)))
 
+  (define (add-integer-poly i p)
+    (make-poly (variable p)
+               (add i (term-list p))))
+
+  (define (mul-integer-poly i p)
+    (make-poly (variable p)
+               (mul i (term-list p))))
+
   (define (div-result var terms)
     (list (tag (make-poly var (car terms)))
-          (tag (make-poly var (cdr terms)))))
+          (tag (make-poly var (cadr terms)))))
 
   (define (div-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
@@ -460,6 +469,7 @@
   (put 'div    '(integer polynomial)    (lambda (i p)         (div-integer-poly i p)))
   (put 'div    '(polynomial integer)    (lambda (p i)         (div-poly-integer p i)))
   (put 'negate '(polynomial)            (lambda (p)           (tag (negate-poly p))))
+
 
   'done)
 
@@ -580,29 +590,29 @@
   ;; internal procedures
   (define (numer x) (car x))
   (define (denom x) (cdr x))
-  (define (make-rat n d)
-    (if (integer? n)
-        (let ((g (gcd n d)))
-          (cons (/ n g) (/ d g)))
-        (let ((rat (rationalize (/ n d) 1/100000)))
-          (make-rat (numerator rat)
-                    (denominator rat)))))
+  (define (make-rat n d) (cons n d))
 
-  (define (ratio x) (/ (numer x) (denom x)))
+  (define (ratio r) 
+    (if (rational-function? r)
+      (error "RATIO: scalar ratio of polynomials not supported" r)
+      (/ (numer r) (denom r))))
 
-  (define (add-rat x y) (make-rat (+ (* (numer x) (denom y))
-                                     (* (numer y) (denom x)))
-                                  (* (denom x) (denom y))))
-  (define (sub-rat x y) (make-rat (- (* (numer x) (denom y))
-                                     (* (numer y) (denom x)))
-                                  (* (denom x) (denom y))))
-  (define (mul-rat x y) (make-rat (* (numer x) (numer y))
-                                  (* (denom x) (denom y))))
-  (define (div-rat x y) (make-rat (* (numer x) (denom y))
-                                  (* (denom x) (numer y))))
+  (define (add-rat x y) (make-rat (add (mul (numer x) (denom y))
+                                     (mul (numer y) (denom x)))
+                                  (mul (denom x) (denom y))))
+  (define (sub-rat x y) (make-rat (sub (mul (numer x) (denom y))
+                                     (mul (numer y) (denom x)))
+                                  (mul (denom x) (denom y))))
+  (define (mul-rat x y) (make-rat (mul (numer x) (numer y))
+                                  (mul (denom x) (denom y))))
+  (define (div-rat x y) (make-rat (mul (numer x) (denom y))
+                                  (mul (denom x) (numer y))))
   (define (equ-rat x y) (and (equ? (numer x) (numer y))
                              (equ? (denom x) (denom y))))
-  (define (=zero-rat x) (zero? (numer x)))
+  (define (=zero-rat x) (=zero? (numer x)))
+  (define (rational-function? r)
+    (or (eq? 'polynomial (type-tag (numer r)))
+        (eq? 'polynomial (type-tag (denom r)))))
   (define (rational->real r) (make-real (exact->inexact (ratio r))))
   (define (project r)
     (make-integer (truncate (ratio r))))
@@ -625,6 +635,7 @@
   (put 'cosine     '(rational)           (lambda (x)   (make-real (cos (ratio x)))))
   (put 'arctan     '(rational rational)  (lambda (x y) (make-real (atan (ratio x) (ratio y)))))
   (put 'negate     '(rational)           (lambda (x)   (sub (tag (make-rat 0 1)) x)))
+
   'done)
 
 
@@ -865,27 +876,21 @@
 ;; Test case
 ;;
 ;; ======================================================================
+(define (show x) (newline) (display x))
 
+(define pd1 (make-dense-polynomial 'x '(1 0 1)))
+(define pd2 (make-dense-polynomial 'x '(1 0 0 1)))
+(define rdf (make-rational pd2 pd1))
 
-; 2 versions of the example division given in the book i.e. (x^5 -1) / (x^2 - 1)
-(define divisor-s  (make-sparse-polynomial 'x '((5 1) (0 -1))))
-(define dividend-s (make-sparse-polynomial 'x '((2 1) (0 -1))))
-(define divisor-d  (make-dense-polynomial 'x '(1 0 0 0 0 -1)))
-(define dividend-d (make-dense-polynomial 'x '(1 0 -1)))
+(define ps1 (make-sparse-polynomial 'x '((2 1) (0 1))))
+(define ps2 (make-sparse-polynomial 'x '((3 1) (0 1))))
+(define rsf (make-rational ps2 ps1))
 
-(display (div divisor-s dividend-s)) (newline)
-; ((polynomial x sparse (3 1) (1 1)) (polynomial x sparse (1 1) (0 -1)))
-(display (div divisor-d dividend-d)) (newline)
-; ((polynomial x dense 1 0 1 0) (polynomial x dense 1 -1))
-(display (div divisor-d divisor-d)) (newline)
-; ((polynomial x dense 1) (polynomial x dense))
-(display (div divisor-s divisor-s)) (newline)
-; ((polynomial x sparse (0 1)) (polynomial x sparse))
-(display (div divisor-d divisor-s)) (newline)
-; ((polynomial x dense 1) (polynomial x dense))
-(display (div divisor-s divisor-d)) (newline)
-; ((polynomial x sparse (0 1)) (polynomial x sparse))
-(display (div divisor-d dividend-s)) (newline)
-; ((polynomial x dense 1 0 1 0) (polynomial x dense 1 -1))
-(display (div divisor-s dividend-d)) (newline)
-; ((polynomial x sparse (3 1) (1 1)) (polynomial x sparse (1 1) (0 -1)))
+(show (add rdf rdf))
+; => (rational (polynomial x dense 2 0 2 2 0 2) polynomial x dense 1 0 2 0 1)
+(show (add rsf rsf))
+; => (rational (polynomial x sparse (5 2) (3 2) (2 2) (0 2)) polynomial x sparse (4 1) (2 2) (0 1))
+(show (=zero? (sub rdf rdf)))
+; => #t
+(show (=zero? (sub (add rdf rdf) rdf)))
+; => #f
