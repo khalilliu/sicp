@@ -1,12 +1,12 @@
 #lang sicp
 
-(define (count-pairs x) 
-  (define (collect-pairs x seen) 
-    (if (or (not (pair? x)) (memq x seen)) 
-        seen 
-        (let ((seen-car (collect-pairs (car x) (cons x seen)))) 
-          (collect-pairs (cdr x) seen-car)))) 
-  (length (collect-pairs x '()))) 
+(define (count-pairs x)
+  (define (iter cur visited)
+    (if (or (not (pair? cur)) (memq cur visited))
+        visited
+        (let ((visited-cars (iter (car cur) (cons cur visited))))
+            (iter (cdr cur) visited-cars) )))
+  (length (iter x '())))
 
 
 (define x '(foo)) 
@@ -16,10 +16,10 @@
 (count-pairs str1)  ; 3
 
 (define str2 (list y)) 
-(count-pairs str2) ; 4 
+(count-pairs str2) ; 3
 
 
 (define str3 (cons y y)) 
 
-(count-pairs str3) ; 7
+(count-pairs str3) ; 3
 
