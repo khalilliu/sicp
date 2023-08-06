@@ -1,13 +1,13 @@
 #lang racket
 
 (require "lib/wires.rkt"
-          "3.29.rkt")
+          )
 
 (provide half-adder
          full-adder)
 
 (define (half-adder a b s c)
-  (with-wires (d e)
+  (let ((d (make-wire)) (e (make-wire)))
               (or-gate a b d)
               (and-gate a b c)
               (inverter c e)

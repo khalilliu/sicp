@@ -1,0 +1,1 @@
+("8.9" ta6osx ("1d5d9f42ef98e79daeb08d0e9148ce8d5419ebdd" . "64da34028afed87b276001801c2708320d5d2853") #"/Users/liukang/Desktop/codespace/engineer/sicp/c3/lib/queue.rkt" (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"mpair.rkt") (collects #"racket" #"runtime-config.rkt"))

@@ -1,0 +1,1 @@
+("8.9" ta6osx ("43cd2f60d07deb71d9cbcfcde7d5b2b6647189c9" . "f32fb2560f8efe5d585d9e5a7af21517981b8b73") #"/Users/liukang/Desktop/codespace/engineer/sicp/c3/lib/wires.rkt" (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))
