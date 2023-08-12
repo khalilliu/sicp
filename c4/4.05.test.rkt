@@ -30,8 +30,8 @@
               (interpret '(cond ((assoc 'z '((a 1) (b 2))) => cadr)
                                 ("values" => (lambda (v) (if (equal? v "values")
                                                             "really values"
-                                                            "something else")))))))
-  ))
+                                                            "something else"))))))
+  )))
 
 
 (require rackunit/text-ui)

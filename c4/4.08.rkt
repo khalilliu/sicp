@@ -1,8 +1,10 @@
 #lang racket 
 
 (require "lib/base-eval.rkt"
-         "ex4.07.rkt"  ;; let*
+         "4.07.rkt"  ;; let*
          ) 
+
+(provide interpret)
 
 ;; Exercise 4.8
 ;;
@@ -33,23 +35,23 @@
 (define (let-initials exp)   (mmap mcadr (mcadr exp)))
 (define (let-parameters exp) (mmap mcar (mcadr exp)))
 (define named-let-identifier mcar)
-(define let-body mcddr)
+(define let-body             mcddr)
 
 
 (define (named-let->combination exp)
   (let ((precedure-name (named-let-identifier exp)))
       (make-begin 
-        (mlist 'define precedure-name
+        (mlist (mlist 'define precedure-name
               (make-lambda 
                 (let-parameters exp)
                 (let-body exp)))
         ; apply the procedure with the initial values given by the let expression
-        (mcons precedure-name (let-initials exp)))
+        (mcons precedure-name (let-initials exp))))
   ))
 
 
 ; a let is syntactic sugar for
-;   ((lambda (params) (body)) values)
+;   ((lambda <params> <body>) values)
 (define (let+named->combination exp)
   (if (named-let? exp)
       (named-let->combination (mcdr exp))

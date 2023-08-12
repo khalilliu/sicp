@@ -44,16 +44,16 @@
 (define (eval-and exp env)
   (define (eval-expression-list exp)
     (cond [(null? exp) true]
-          [(last-exp? exp) (eval (firse-exp exp) env)]
-          [(eval (firse-exp exp) env) (eval-expression-list (rest-exps exp))]
+          [(last-exp? exp) (eval (first-exp exp) env)]
+          [(eval (first-exp exp) env) (eval-expression-list (rest-exps exp))]
           [else false]))
   (eval-expression-list (boolean-expression-list exp)))
 
 (define (eval-or exp env)
   (define (eval-expression-list exp)
     (cond [(null? exp) false]
-          [(last-exp? exp) (eval (firse-exp exp) env)]
-          [(eval (firse-exp exp) env) true]
+          [(last-exp? exp) (eval (first-exp exp) env)]
+          [(eval (first-exp exp) env) true]
           [else (eval-expression-list (rest-exps exp))]))
   (eval-expression-list (boolean-expression-list exp)))
 
@@ -62,7 +62,7 @@
 
 (define (install-boolean-syntax)
   (put-syntax! '||  eval-or)
-  (put-syntax! '&&  eval-or)
+  (put-syntax! '&&  eval-and)
   (put-syntax! 'fun eval-definition)
   (void))
 

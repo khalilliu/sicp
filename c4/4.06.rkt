@@ -1,9 +1,9 @@
 #lang racket
 
-; (require "lib/base-eval.rkt"
-;        "4.05.rkt")
+(require "lib/base-eval.rkt"
+       "4.05.rkt")
 
-; (provide interpret)
+(provide interpret)
 
 ;; Exercise 4.6
 ;;

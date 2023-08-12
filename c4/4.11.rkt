@@ -6,12 +6,12 @@
                     lookup-variable-value
                     set-variable-value!
                     define-variable!)
-         "ex4.04.rkt"  ;; boolean expression
-         "ex4.05.rkt"  ;; cond with =>
-         "ex4.06.rkt"  ;; let
-         "ex4.07.rkt"  ;; let*
-         "ex4.08.rkt"  ;; named-let
-         "ex4.09.rkt"  ;; while
+         "4.04.rkt"  ;; boolean expression
+         "4.05.rkt"  ;; cond with =>
+         "4.06.rkt"  ;; let
+         "4.07.rkt"  ;; let*
+         "4.08.rkt"  ;; named-let
+         "4.09.rkt"  ;; while
          )
 
 

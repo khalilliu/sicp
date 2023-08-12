@@ -1,0 +1,1 @@
+("8.9" ta6osx ("55f72f65e21dae79c829e11be6ea251c4b5a61ec" . "3e459034000f6471256696d076e159d5c0cb0e6c") #"/Users/liukang/Desktop/codespace/engineer/sicp/c4/lib/mutable.rkt" (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))

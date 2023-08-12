@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require rackunit
-         "ex4.06.rkt")
+         "4.06.rkt")
 
 ; regressions tests
 ;(require "ex4.03.test.rkt"

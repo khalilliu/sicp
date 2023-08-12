@@ -1,31 +1,25 @@
 #lang racket
 
 (require "lib/base-eval.rkt")
-
 (provide interpret)
 
+; Boolean expressions
 (define boolean-expression-list mcdr)
 
-;; (and (bool-exp) (bool-exp) ...)
-;; false if we meet a false value
-;; return true if we meet null 
 (define (eval-and exp env)
   (define (eval-expression-list exp)
-    (cond [(null? exp) #t]
+    (cond [(null? exp) true]
           [(last-exp? exp) (eval (first-exp exp) env)]
-          [(eval (first-exp exp) env) (eval-expression-list (rest-exps exp) env)]
-          [else #f]))
+          [(eval (first-exp exp) env) (eval-expression-list (rest-exps exp))]
+          [else false]))
   (eval-expression-list (boolean-expression-list exp)))
 
-;; (or (bool-exp) (bool-exp) ...)
-;; true if meet a true value
-;; return false if we meet null 
 (define (eval-or exp env)
   (define (eval-expression-list exp)
-    (cond [(null? exp) #f]
+    (cond [(null? exp) false]
           [(last-exp? exp) (eval (first-exp exp) env)]
-          [(eval (first-exp exp) env) #t]
-          [else (eval-expression-list (rest-exps exp) env)]))
+          [(eval (first-exp exp) env) true]
+          [else (eval-expression-list (rest-exps exp))]))
   (eval-expression-list (boolean-expression-list exp)))
 
 
@@ -35,3 +29,5 @@
   (void))
 
 (install-boolean-syntax)
+
+(interpret '(or false))

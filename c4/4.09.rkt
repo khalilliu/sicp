@@ -1,7 +1,7 @@
 #lang racket 
 
 (require "lib/base-eval.rkt"
-         "ex4.08.rkt"  ;; named-let
+         "4.08.rkt"  ;; named-let
          ) 
 
 (provide interpret)
@@ -40,7 +40,6 @@
 ;;      (while-loop))
 ;;    false))
 
-
 (define while-predicate mcadr)
 (define while-body mcddr)
 
@@ -50,10 +49,10 @@
 (define (while->named-let exp)
   (let ((while-name (gensym 'while)))
     (mappend (mlist 'let while-name '())
-             (mlist (make-if  (while-predicate exp)
-                              (make-begin (mappend (while-body exp)
-                                                   (mlist (mlist while-name))))
-                              'false)))))
+             (mlist (make-if (while-predicate exp)
+                             (make-begin (mappend (while-body exp)
+                                                  (mlist (mlist while-name))))
+                             'false)))))
 
 (define (install-while-syntax)
   (put-syntax! 'while eval-while)
