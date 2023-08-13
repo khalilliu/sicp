@@ -1,0 +1,20 @@
+#lang racket/base
+(require rackunit
+         "4.12.rkt"
+         "4.03.test.rkt"
+         "4.04.test.rkt"
+         "4.05.test.rkt"
+         "4.06.test.rkt"
+         "4.07.test.rkt"
+         "4.08.test.rkt"
+         "4.09.test.rkt"
+         "4.10.test.rkt"
+         "4.11.test.rkt"
+         "4.12.test.rkt"
+         "4.13.test.rkt"
+        ;  "4.16.test.rkt"
+        ;  "4.20.test.rkt"
+        ;  "4.22.test.rkt"
+        ;  "4.26.test.rkt"
+        ;  "4.31.test.rkt"
+         )

@@ -116,7 +116,7 @@
 ;;    (lambda (<param_1> ... <param_n>)
 ;;     <body>))
 (define (definition? exp)
-  (tagged-list? exp 'defition))
+  (tagged-list? exp 'define))
 (define (definition-variable exp)
   (if (symbol? (mcadr exp))
       (mcadr exp)
