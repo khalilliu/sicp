@@ -10,6 +10,7 @@
          (all-from-out "mutable.rkt")
          (all-from-out "table.rkt"))
 
+
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
         ((variable? exp) (lookup-variable-value exp env))
@@ -25,20 +26,21 @@
 
 (define (apply procedure arguments env)
   (cond ((primitive-procedure? procedure)
-         (apply-primitive-procedure procedure 
-                                    (list-of-arg-values arguments env)))  ; changed
+         (apply-primitive-procedure
+          procedure
+          (list-of-arg-values arguments env)))  ; changed
         ((compound-procedure? procedure)
-         (eval-sequence
-          (procedure-body procedure)
-          (extend-environment
-           (procedure-parameters procedure)
-           (list-of-delayed-args arguments env) ; changed
-           (procedure-environment procedure))))
+         (let ((formal-parameters (procedure-parameters procedure)))
+           (eval-sequence
+            (procedure-body procedure)
+            (extend-environment
+             formal-parameters
+             (list-of-args formal-parameters arguments env) ; changed
+             (procedure-environment procedure)))))
         (else
          (error
           "Unknown procedure type -- APPLY" procedure))))
 
-; Procedure arguments
 (define (list-of-arg-values exps env)
   (if (no-operands? exps)
       '()
@@ -46,12 +48,14 @@
              (list-of-arg-values (rest-operands exps)
                                  env))))
 
-(define (list-of-delayed-args exps env)
+(define (list-of-args formal-parameters exps env)
   (if (no-operands? exps)
       '()
-      (mcons (delay-it (first-operand exps) env)
-             (list-of-delayed-args (rest-operands exps)
-                                   env))))
+      (mcons (if (lazy-arg? (first-operand formal-parameters))
+                 (delay-it (first-operand exps) env)
+                 (eval (first-operand exps) env))
+              (list-of-args (rest-operands formal-parameters)
+                            (rest-operands exps) env))))
 
 (define (list-of-values exps env)
   (if (no-operands? exps)
@@ -59,16 +63,19 @@
       (mcons (eval (first-operand exps) env)
              (list-of-values (rest-operands exps) env))))
 
-;; Lazy values
-;;
 
-;; Thunks should be momoised so that once a value has been forced
-;; it's value is kept and the environment it was created in can be discarded
-;; 
+;; lazy values
+
 (define (force-it obj)
+  (if (memo? obj)
+      (force-memo obj)
+      (force-non-memo obj)))
+
+(define (force-memo obj)
   (cond ((thunk? obj)
-         (let ((result (actual-value (thunk-exp obj)
-                                     (thunk-env obj))))
+         (let ((result (actual-value
+                        (thunk-exp obj)
+                        (thunk-env obj))))
            (set-mcar! obj 'evaluated-thunk)
            (set-mcar! (mcdr obj) result)  ; replace exp with its value
            (set-mcdr! (mcdr obj) '())     ; forget unneeded env
@@ -77,50 +84,71 @@
          (thunk-value obj))
         (else obj)))
 
-;; delayed values access to the environment they are created in
+(define (force-non-memo obj)
+  (if (thunk? obj)
+      (actual-value (thunk-exp obj) (thunk-env obj))
+      obj))
+
 (define (delay-it exp env)
-  (mlist 'thunk exp env))
+  (if (thunk? exp)
+      exp
+      (mlist 'thunk exp env)))
 
-;; thunks
-(define (thunk? obj) 
+(define (lazy-arg? arg)
+  (cond ((not (mpair? arg)) #f)
+        ((null? (mcdr arg)) #f)
+        ((eq? (mcadr arg) 'lazy)      #t)
+        ((eq? (mcadr arg) 'lazy-memo) #t)
+        (else #f)))
+
+(define (memo? arg)
+  (and (lazy-arg? arg)
+       (eq? (mcadr arg) 'lazy-memo)))
+
+(define (thunk? obj)
   (tagged-list? obj 'thunk))
-(define (evaluated-thunk? obj) 
+
+(define (evaluated-thunk? obj)
   (tagged-list? obj 'evaluated-thunk))
-(define thunk-exp mcadr)
-(define thunk-env mcaddr)
-(define thunk-value mcadr)
 
+(define (thunk-exp thunk) 
+  (let ((exp (mcadr thunk)))
+    (if (lazy-arg? exp)
+        (mcar exp)
+        exp)))
 
-; Quoted data
+(define (thunk-env thunk) (mcaddr thunk))  
+
+(define (thunk-value evaluated-thunk) (mcadr evaluated-thunk))
+
 
 (define (eval-quoted exp env)
   (text-of-quotation exp))
 
-; Conditionals
-
+;; eval if
 (define (eval-if exp env)
   (if (true? (actual-value (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 
-; Sequences
 
+;; eval begin
 (define (eval-begin exp env)
   (eval-sequence (begin-actions exp) env))
 
-;; Cy's version of eval-sequemce 
 (define (eval-sequence exps env)
-  (cond ((last-exp? exps) (eval (first-exp exps) env))  ;;; change line
-        (else (actual-value (first-exp exps) env)
+  (cond ((last-exp? exps) (eval (first-exp exps) env))
+        (else (eval (first-exp exps) env)
               (eval-sequence (rest-exps exps) env))))
 
-; Assignments and definitions
-
+;; eval assignment
 (define (eval-assignment exp env)
   (set-variable-value! (assignment-variable exp)
                        (eval (assignment-value exp) env)
                        env)
   (void))
+
+
 
 (define (eval-definition exp env)
   (define-variable! (definition-variable exp)
@@ -128,56 +156,47 @@
     env)
   (void))
 
-; Anonymous procedures
+;; eval lambda
 
 (define (eval-lambda exp env)
   (make-procedure (lambda-parameters exp)
                   (lambda-body exp)
                   env))
 
-; ¤ The only self-evaluating items are numbers and strings:
+;; self-evaluating items are numbers and strings:
 
 (define (self-evaluating? exp)
   (cond ((number? exp) true)
         ((string? exp) true)
         (else false)))
 
-; ¤ Variables are represented by symbols:
-
 (define (variable? exp) (symbol? exp))
 
-; ¤ Quotations have the form (quote <text-of-quotation>):9
+;; exp: (quote <text-of-quotation>)
 
 (define (quoted? exp)
   (tagged-list? exp 'quote))
 
 (define (text-of-quotation exp) (mcadr exp))
 
-; Quoted? is defined in terms of the procedure tagged-list?, which identifies lists beginning with a designated symbol:
-
 (define (tagged-list? exp tag)
   (if (mpair? exp)
       (eq? (mcar exp) tag)
       false))
 
-; ¤ Assignments have the form (set! <var> <value>):
-
+;; assignment: (set! <var> <value>)
 (define (assignment? exp)
   (tagged-list? exp 'set!))
 (define (assignment-variable exp) (mcadr exp))
 (define (assignment-value exp) (mcaddr exp))
 
-; ¤ Definitions have the form
-;(define <var> <value>)
-;or the form
-;(define (<var> <parameter1> ... <parametern>)
-;  <body>) which is syntactic sugar for
-;define <var>
-;  (lambda (<parameter1> ... <parametern>)
-;    <body>))
-
-; The corresponding syntax procedures are the following:
-
+;; definitions 
+;; 1. (define <var> <value>)
+;; 2. (define (<var> <param_1> ... <param_n>) <body>)
+;; syntactic sugar for
+;;  (define <var>  
+;;    (lambda (<param_1> ... <param_n>)
+;;     <body>))
 (define (definition? exp)
   (tagged-list? exp 'define))
 (define (definition-variable exp)
@@ -190,20 +209,16 @@
       (make-lambda (mcdadr exp)   ; formal parameters
                    (mcddr exp)))) ; body
 
-;¤ Lambda expressions are lists that begin with the symbol lambda:
-
+;; lambda
 (define (lambda? exp) (tagged-list? exp 'lambda))
 (define (lambda-parameters exp) (mcadr exp))
 (define (lambda-body exp) (mcddr exp))
 
-; We also provide a constructor for lambda expressions, which is used by definition-value, above:
-
 (define (make-lambda parameters body)
   (mcons 'lambda (mcons parameters body)))
 
-; ¤ Conditionals begin with if and have a predicate, a consequent, and an (optional) alternative. 
-; If the expression has no alternative part, we provide false as the alternative.10
-
+;; if 
+;; ('if <predicate> <consequent> <alternative>)
 (define (if? exp) (tagged-list? exp 'if))
 (define (if-predicate exp) (mcadr exp))
 (define (if-consequent exp) (mcaddr exp))
@@ -212,28 +227,26 @@
       (mcadddr exp)
       'false))
 
-; We also provide a constructor for if expressions, to be used by cond->if to transform cond expressions into if expressions:
-
 (define (make-if predicate consequent alternative)
   (mlist 'if predicate consequent alternative))
 
-; ¤ Begin packages a sequence of expressions into a single expression. We include syntax operations on begin expressions to extract the actual sequence from the begin expression, as well as selectors that return the first expression and the rest of the expressions in the sequence.11
-
+;; begin
+;; ('begin <action> ... <last-action>)
 (define (begin? exp) (tagged-list? exp 'begin))
 (define (begin-actions exp) (mcdr exp))
 (define (last-exp? seq) (null? (mcdr seq)))
 (define (first-exp seq) (mcar seq))
 (define (rest-exps seq) (mcdr seq))
 
-; We also include a constructor sequence->exp (for use by cond->if) that transforms a sequence into a single expression, using begin if necessary:
 (define (sequence->exp seq)
   (cond ((null? seq) seq)
         ((last-exp? seq) (first-exp seq))
         (else (make-begin seq))))
 (define (make-begin seq) (mcons 'begin seq))
 
-; ¤ A procedure application is any compound expression that is not one of the above expression types. The car of the expression is the operator, and the cdr is the list of operands:
 
+;; application 
+;; (<application-name> ...arguments)
 (define (application? exp) (mpair? exp))
 (define (operator exp) (mcar exp))
 (define (operands exp) (mcdr exp))
@@ -241,22 +254,12 @@
 (define (first-operand ops) (mcar ops))
 (define (rest-operands ops) (mcdr ops))
 
-; Derived expressions
-; ========================================
 
-; Cond Case dispatch
-
-; Some special forms in our language can be defined in terms of expressions involving other special forms, 
-; rather than being implemented directly. One example is cond, which can be implemented as a nest of if expressions. 
-
-; Implementing the evaluation of cond in this way simplifies the evaluator because it reduces 
-; the number of special forms for which the evaluation process must be explicitly specified.
-
-; We include syntax procedures that extract the parts of a cond expression, 
-; and a procedure cond->if that transforms cond expressions into if expressions. 
-; A case analysis begins with cond and has a list of predicate-action clauses. 
-; A clause is an else clause if its predicate is the symbol else.12
-
+;; cond
+;; ('cond (<predicate1> <action1>) ... ('else <else-action>))
+;; equal to :
+;; ('if <predicate1> <action1> 
+;;    ('if <predicate2> <action2> <else-action>))
 (define (cond? exp) (tagged-list? exp 'cond))
 (define (eval-cond exp env)
   (eval (cond->if exp) env))
@@ -266,11 +269,6 @@
 (define (cond-predicate clause)         (mcar clause))
 (define (cond-recipient clause)         (mcaddr clause))
 (define (cond-recipient-clause? clause) (eq? (mcadr clause) '=>))
-
-
-; this checks against the 2 forms for cond clauses
-; 1) ((pred-clauses) (value-clauses)) -> result is (value-clauses)
-; 2) ((pred-values) => proc)         -> result is (proc v)
 
 (define (make-cond-recipient clause predicate)
   (mlist (cond-recipient clause) predicate))
@@ -301,17 +299,13 @@
                        (cond-consequent first predicate)
                        (expand-clauses rest)))))))
 
-; For conditionals, we accept anything to be true that is not the explicit false object.
+;; Boolean
 (define (true? x)
   (not (eq? x false)))
 (define (false? x)
   (eq? x false))
 
-; Representing procedures
-; To handle primitives, we assume that we have available the following procedures:
-;    * (apply-primitive-procedure <proc> <args>)
-;    * (primitive-procedure? <proc>)
-; Compound procedures are constructed from parameters, procedure bodies, and environments using the constructor make-procedure:
+;; Procedures
 (define (make-procedure parameters body env)
   (mlist 'procedure parameters body env))
 (define (compound-procedure? p)
@@ -320,16 +314,27 @@
 (define (procedure-body p) (mcaddr p))
 (define (procedure-environment p) (mcadddr p))
 
-; Operations on Environments
+
+;; Environments 
 (define (enclosing-environment env) (mcdr env))
 (define (first-frame env) (mcar env))
 (define the-empty-environment '())
 
-; Each frame of an environment is represented as a pair of lists: 
-; a list of the variables bound in that frame and 
-; a list of the associated values
-(define (make-frame variables values)
-  (mcons variables values))
+(define (make-frame variables values base-env)
+  (let ((new-frame (mcons null null)))
+       (mmap (lambda (var val)
+                ;; change from lazy-eval
+                (add-binding-to-frame! (var-name var) (var-value var val base-env) new-frame))
+              variables 
+              values)
+       new-frame))
+
+;; change from lazy-eval
+(define (var-name var)
+  (if (lazy-arg? var) (mcar var) var))
+(define (var-value var val env)
+  (if (lazy-arg? var) (delay-it val env) val))
+
 (define (frame-variables frame) (mcar frame))
 (define (frame-values frame) (mcdr frame))
 (define (add-binding-to-frame! var val frame)
@@ -338,15 +343,11 @@
 
 (define (extend-environment vars vals base-env)
   (if (= (mlength vars) (mlength vals))
-      (mcons (make-frame vars vals) base-env)
+      (mcons (make-frame vars vals base-env) base-env)
       (if (< (mlength vars) (mlength vals))
           (error "Too many arguments supplied" vars vals)
           (error "Too few arguments supplied" vars vals))))
 
-; To look up a variable in an environment, we scan the list of variables in the first frame. 
-; If we find the desired variable, we return the corresponding element in the list of values. 
-; If we do not find the variable in the current frame, we search the enclosing environment, and so on. 
-; If we reach the empty environment, we signal an ``unbound variable'' error.
 
 (define (lookup-variable-value var env)
   (define (env-loop env)
@@ -389,8 +390,10 @@
     (scan (frame-variables frame)
           (frame-values frame))))
 
+
 ; Boolean expressions
 (define boolean-expression-list mcdr)
+
 
 (define (eval-and exp env)
   (define (eval-expression-list exp)
@@ -408,6 +411,8 @@
           [else (eval-expression-list (rest-exps exp))]))
   (eval-expression-list (boolean-expression-list exp)))
 
+
+
 ; Let statements
 ; may be named or not named
 
@@ -418,21 +423,14 @@
   (and (tagged-list? exp 'let)
        (symbol? (mcadr exp))))
 
-; Let selectors
-(define (let-initials exp)   (mmap mcadr (mcadr exp)))
+;; Let selectors
+(define (let-initials exp) (mmap mcadr (mcadr exp)))
 (define (let-parameters exp) (mmap mcar (mcadr exp)))
 (define named-let-identifier mcar)
-(define let-body             mcddr)
-
+(define let-body mcddr)
 
 ;; Named Let statements
 
-; A named let is equivalent to a procedure definition 
-; followed by a single application of that procedure with the 
-; initial values given by the let expression.
-;
-; exp should be the initial let expression stripped of the 'let symbol
-;   this allows the same selection procedures to be used without altering them.
 (define (named-let->combination exp)
   (let ((procedure-name (named-let-identifier exp)))
     ; 2 expressions are needed so wrap them in a begin form
@@ -446,8 +444,7 @@
       ; apply the procedure with the initial values given by the let expression
       (mcons procedure-name (let-initials exp))))))
 
-; a let is syntactic sugar for
-;   ((lambda (params) (body)) values)
+
 (define (let->combination exp)
   (if (named-let? exp)
       (named-let->combination (mcdr exp))
@@ -455,9 +452,8 @@
                           (let-body exp))
              (let-initials exp))))
 
-; Let* statements
-
-; a let* is syntactic sugar for nested lets
+;;; Let* statements
+;;; a let* is syntactic sugar for nested lets
 (define (let*->nested-lets exp)
   (define (make-let params)
     (cond ((last-exp? params) 
@@ -472,8 +468,8 @@
 (define (eval-let* exp env)
   (eval (let*->nested-lets exp) env))
 
-; Letrec
-;
+  
+;;; Letrec statements
 (define (eval-letrec exp env)
   (eval (letrec->let exp) env))
 
@@ -511,6 +507,10 @@
            initial-values 
            body))
 
+
+
+;; install all syntaxs to syntax-table
+
 (define (install-syntax)
   (put-syntax! 'quote eval-quoted) 
   (put-syntax! 'define eval-definition) 
@@ -527,7 +527,6 @@
   (void))
 (install-syntax)
 
-; 4.1.4  Running the Evaluator as a Program
 
 (define primitive-procedures
   (mlist (mlist '* *)
@@ -735,6 +734,7 @@
 ; We precede each printed result by an output prompt so as to distinguish 
 ; the value of the expression from other output that may be printed
 ;
+
 (define input-prompt ";;; L-Eval input:")
 (define output-prompt ";;; L-Eval value:")
 
@@ -764,3 +764,4 @@
                      (procedure-body object)
                      '<procedure-env>))
       (display object)))
+
