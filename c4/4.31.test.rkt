@@ -396,11 +396,14 @@
               (test-equal? "Using lazy memo fib"
                            (interpret '(f 105 4 3 (fib 8)))
                            46)
-              (interpret '(define (g a (b lazy))
+              (interpret '(define (g1 a b)
                             (+ a a)))
-              (test-equal? "use of lazy divide by zero"
-                           (interpret '(g 8 (/ 5 0)))
-                           16))
+              (interpret '(define (g2 a (b lazy))
+                            (+ a a)))
+              (check-exn  exn:fail?
+                          (lambda () (interpret '(g1 8 (/ 5 0)))))
+              (check-not-exn (lambda () (interpret '(g2 8 (/ 5 0))))
+                           ))
    ))
 
 (require rackunit/text-ui)
