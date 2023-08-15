@@ -57,7 +57,7 @@
                    [else (env-loop (enclosing-environment env))]))))
   (env-loop env))
 
-(define (bonud? var frame) 
+(define (bound? var frame) 
   (mmemq var (mcar frame)))
 
 (define (unassigned? var frame)
