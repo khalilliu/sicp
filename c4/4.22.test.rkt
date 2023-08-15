@@ -32,9 +32,8 @@
     )
 
     ;;  note: -cond- also tests how -begin- works
-    (test-true "test-cond 1" (interpret '(cond (false false) (else true))))
-    (test-false "test-cond 2" (interpret '(cond (true true) (else false))))
-
+   (test-true "test-cond 1" (interpret '(cond (false false) (else true))))
+   (test-true "test-cond 2" (interpret '(cond (true true) (else false))))
     (test-true "test-cond 3"
             (interpret 
               '(cond 
@@ -166,22 +165,23 @@
         (test-equal? "higher order procedures" 101 (interpret '((compose inc square) 10)))
       )
 
-      (test-case
-        "test-let"
-        (test-equal? 
-          "simple-let"
-          6
-          (interpret '(let ((x 2) (y 3)) (+ x y))))
+      (test-case 
+        "test let"
+        (test-equal?
+        "simple let"
+        6
+        (interpret '(let ((a 1) (b 2) (c 3)) 
+                      (+ a b c))))
+        
         (interpret '(define (square x) (* x x)))
         (interpret '(define (square-1 x) (+ (square x)
                                             (square (- x 1)))))
-
-        (test-equal?
-          "complex let with procedure calls"
-          453220
-          (interpret '(let ((a (square-1 7))
-                       (b (+ (* 17 (square-1 13)) 11)))
-                   (* a b)))))
+        (test-equal? 
+        "complex let with procedure calls"
+        453220
+        (interpret '(let ((a (square-1 7))
+                          (b (+ (* 17 (square-1 13)) 11)))
+                      (* a b)))))
 ))
 
 

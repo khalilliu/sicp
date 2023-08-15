@@ -22,7 +22,7 @@
 
 (collect-garbage)
 (time (test-interpreter interpret))
-;; => cpu time: 7293 real time: 7295 gc time: 687
+;; cpu time: 1373 real time: 1451 gc time: 11
 (collect-garbage)
 (time (test-interpreter analyze+interpret))
-;; => cpu time: 2594 real time: 2595 gc time: 670
+;; cpu time: 253 real time: 267 gc time: 1

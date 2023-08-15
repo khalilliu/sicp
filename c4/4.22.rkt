@@ -53,7 +53,7 @@
       (lambda (env) qval)))
 
 (define (analyze-variable exp)
-  (lambda (env) (lookup-variable-value exp env)))
+  (lambda (env) (lookup-variable-value exp env)))  
 
 (define (analyze-assignment exp)
   (let ((var (assignment-variable exp))
@@ -63,11 +63,11 @@
                'ok)))
 
 (define (analyze-definition exp)
-  (let ((var (definition-value exp))
+  (let ((var (definition-variable exp))
         (vproc (analyze (definition-value exp))))
-       (lambda (env) 
-          (define-variable! var (vproc env) env)
-          'ok)))
+    (lambda (env)
+      (define-variable! var (vproc env) env)
+      'ok)))  
 
 (define (analyze-if exp)
   (let ((pproc (analyze (if-predicate exp)))
@@ -262,6 +262,7 @@
   'ok)
 
 (define (define-variable! var val env)
+
   (let ((frame (first-frame env)))
       (if (bound? frame var)
           (set-binding-in-frame! var val frame)
@@ -308,7 +309,7 @@
 (define (if-predicate exp) (mcadr exp))
 (define (if-consequent exp) (mcaddr exp))
 (define (if-alternative exp) (if (not (null? (mcdddr exp)))
-                                 (mcdddr exp)
+                                 (mcadddr exp)
                                  'false))
 (define (eval-if exp env)
   (if (true? (eval (if-predicate exp) env))
@@ -645,3 +646,11 @@
 
 (define (interpret exp)
   (mlist->exp (eval (exp->mlist exp) the-global-environment)))
+
+
+;; test
+;;; (interpret '(define a 1))
+;;; (interpret 'a)
+
+;;; (interpret '(cond (true true) (else false)))
+;;; (interpret '(if (= 4 5) false 1))
