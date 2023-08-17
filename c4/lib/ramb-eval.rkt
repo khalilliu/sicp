@@ -1,19 +1,12 @@
 #lang racket
 
-(require (except-in "base-eval.rkt" 
-                     interpret))
+(require (except-in "base-eval.rkt"
+                    interpret))
 
-(provide interpret  
+(provide interpret
          driver-loop)
 
-;;;;AMB EVALUATOR FROM SECTION 4.3 OF
-;;;; STRUCTURE AND INTERPRETATION OF COMPUTER PROGRAMS
 
-
-(define (amb? exp)
-  (tagged-list? exp 'amb))
-
-(define (amb-choices exp) (mcdr exp))
 
 
 (define (analyze exp)
@@ -21,13 +14,16 @@
         ((quoted? exp)          (analyze-quoted exp))
         ((variable? exp)        (analyze-variable exp))
         ((assignment? exp)      (analyze-assignment exp))
+        ((permanent-set? exp)   (analyze-permanent-set! exp))
         ((definition? exp)      (analyze-definition exp))
         ((if? exp)              (analyze-if exp))
+        ((if-fail? exp)              (analyze-if-fail exp))
         ((lambda? exp)          (analyze-lambda exp))
         ((begin? exp)           (analyze-sequence (begin-actions exp)))
         ((cond? exp)            (analyze (cond->if exp)))
         ((let? exp)             (analyze (let->combination exp))) ;**
-        ((amb? exp)             (analyze-amb exp))                ;**
+        ((amb? exp)             (analyze-amb exp)) 
+        ((ramb? exp)            (analyze-ramb exp))               
         ((application? exp)     (analyze-application exp))
         (else
          (error "Unknown expression type -- ANALYZE" exp))))
@@ -67,6 +63,20 @@
                     (cproc env succeed fail2)
                     (aproc env succeed fail2)))
              fail))))
+
+;;; if-fail
+(define (if-fail? exp) (tagged-list? exp 'if-fail))
+(define if-fail-success mcadr)
+(define if-fail-failure mcaddr)
+
+(define (analyze-if-fail exp)
+  (let ((sproc (analyze (if-fail-success exp)))
+        (fproc (analyze (if-fail-failure exp))))
+      (lambda (env succeed fail)
+        (sproc env 
+               succeed
+               (lambda ()
+                  (fproc env succeed fail))))))
 
 (define (analyze-sequence exps)
   (define (sequentially a b)
@@ -112,6 +122,24 @@
                             (fail2)))))
              fail))))
 
+;;; 4.51 
+;;; add permanent-set! to the global environment
+(define (permanent-set? exp) (tagged-list? exp 'permanent-set!))
+(define (analyze-permanent-set! exp)
+  (let ((var (assignment-variable exp))
+        (vproc (analyze (assignment-value exp))))
+    (lambda (env succeed fail)
+      (vproc env
+             (lambda (val fail2)        ; *1*
+               (let ((old-value
+                      (lookup-variable-value var env))) 
+                 (set-variable-value! var val env)
+                 (succeed 'ok
+                          (lambda ()    ; *2*
+                            (fail2)))))
+             fail))))
+
+
 (define (analyze-application exp)
   (let ((fproc (analyze (operator exp)))
         (aprocs (mmap analyze (operands exp))))
@@ -155,22 +183,60 @@
            fail)]
         [else (error "Unknown procedure type -- EXECUTE" proc)]))
 
+
+;;;amb expressions
+(define (amb? exp)
+  (tagged-list? exp 'amb))
+
+(define (amb-choices exp) (mcdr exp))
+
 (define (analyze-amb exp)
   (let ((cprocs (mmap analyze (amb-choices exp))))
     (lambda (env succeed fail)
       (define (try-next choices)
         (if (null? choices)
             (fail)
-            ((mcar choices) env   
+            ((mcar choices) env
                             succeed
-                            (lambda () (try-next (mcdr choices))))))
+                            (lambda ()
+                              (try-next (mcdr choices))))))
+      (try-next cprocs))))
+
+
+
+;;; ramb expressions
+
+(define (ramb? exp)
+  (tagged-list? exp 'ramb))
+
+(define (ramb-choices exp) (mcdr exp))
+
+(define (any choices) (mlist-ref choices (random (mlength choices))))
+
+(define (remove-from x xs)
+  (cond ((null? xs) null)
+        ((equal? x (mcar xs)) (mcdr xs))
+        (else (mcons (mcar xs) (remove-from x (mcdr xs))))))
+
+
+(define (analyze-ramb exp)
+  (let ((cprocs (mmap analyze (ramb-choices exp))))
+    (lambda (env succeed fail)
+      (define (try-next choices)
+        (if (null? choices)
+            (fail)
+            (let ((choice (any choices)))
+              (choice env
+                      succeed
+                      (lambda ()
+                        (try-next (remove-from choice choices)))))))
       (try-next cprocs))))
 
 
 ;;;Driver loop
 
-(define input-prompt ";;; Amb-Eval input:")
-(define output-prompt ";;; Amb-Eval value:")
+(define input-prompt ";;; Ramb-Eval input:")
+(define output-prompt ";;; Ramb-Eval value:")
 
 (define (driver-loop)
   (define (internal-loop try-again)
