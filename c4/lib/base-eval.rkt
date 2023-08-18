@@ -289,6 +289,14 @@
 
 (install-syntax)
 
+;;; Exercise 4.60
+(define (person<? p1 p2)
+  (string<? (person->string p1)
+            (person->string p2)))
+
+(define (person->string p)
+  (apply-in-underlying-scheme string-append (map symbol->string p)))
+
 
 (define primitive-procedures
   (mlist (mlist '* *)
@@ -446,6 +454,9 @@
          (mlist 'write write)
          (mlist 'write-char write-char)
          (mlist 'zero? zero?)
+
+        ;;;  Exercice 4.60
+        (mlist 'person<? person<?)
 ))
 
 (define (primitive-procedures-names)
